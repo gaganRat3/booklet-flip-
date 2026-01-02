@@ -4,14 +4,14 @@ from .models import FlipBook, BookView
 
 @admin.register(FlipBook)
 class FlipBookAdmin(admin.ModelAdmin):
-    list_display = ['title', 'created_by', 'total_pages', 'is_published', 'created_at']
+    list_display = ['title', 'thumbnail_preview', 'created_by', 'total_pages', 'is_published', 'created_at']
     list_filter = ['is_published', 'created_at']
     search_fields = ['title', 'description']
-    readonly_fields = ['total_pages', 'thumbnail', 'created_at', 'updated_at']
+    readonly_fields = ['total_pages', 'thumbnail_preview', 'created_at', 'updated_at']
     
     fieldsets = (
         ('Book Information', {
-            'fields': ('title', 'description', 'pdf_file', 'thumbnail')
+            'fields': ('title', 'description', 'pdf_file', 'thumbnail', 'thumbnail_preview')
         }),
         ('Settings', {
             'fields': ('is_published', 'created_by')
@@ -21,6 +21,13 @@ class FlipBookAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    def thumbnail_preview(self, obj):
+        if obj.thumbnail:
+            return f'<img src="{obj.thumbnail.url}" style="max-width: 200px; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />'
+        return '<span style="color: #999;">No thumbnail</span>'
+    thumbnail_preview.short_description = 'Thumbnail Preview'
+    thumbnail_preview.allow_tags = True
 
     def save_model(self, request, obj, form, change):
         if not change:  # If creating new object
