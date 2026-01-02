@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ book.title }} - FlipBook{% endblock %}
+
+{% block extra_css %}
+<style>
+    body { overflow: hidden; }
+    .flipbook-viewer { position: fixed; top: 80px; left: 0; right: 0; bottom: 0; background: #2d3748; display: flex; flex-direction: column; }
+    .viewer-header { background: rgba(255, 255, 255, 0.95); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+    .viewer-title { font-size: 18px; font-weight: 600; color: #333; }
+    .viewer-back { text-decoration: none; color: #667eea; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: color 0.3s; }
+    .viewer-back:hover { color: #764ba2; }
+    .viewer-content { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden; position: relative; }
+    .flipbook-container { position: relative; max-width: 90%; max-height: 90%; margin: auto; }
+    #flipbook { width: 100%; height: 100%; }
+    #flipbook .page { background: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); }
+    #flipbook .page img { width: 100%; height: 100%; object-fit: contain; }
+    .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); padding: 15px 25px; border-radius: 50px; display: flex; gap: 15px; align-items: center; box-shadow: 0 5px 30px rgba(0, 0, 0, 0.5); z-index: 100; }
+    .control-btn { background: rgba(255, 255, 255, 0.1); border: none; color: white; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .control-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); transform: scale(1.1); }
+    .control-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .page-counter { color: white; font-weight: 600; font-size: 14px; min-width: 80px; text-align: center; padding: 0 15px; }
+    .zoom-controls { display: flex; gap: 10px; margin-left: 15px; padding-left: 15px; border-left: 1px solid rgba(255, 255, 255, 0.2); }
+    .fullscreen-btn { margin-left: 15px; padding-left: 15px; border-left: 1px solid rgba(255, 255, 255, 0.2); }
+    .loading-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 48px; animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+    @media (max-width: 768px) {
+        .flipbook-viewer { top: 70px; }
+        .viewer-header { padding: 10px 15px; }
+        .viewer-title { font-size: 16px; }
+        .viewer-content { padding: 10px; }
+        .flipbook-container { max-width: 95%; max-height: 80%; }
+        .controls { bottom: 15px; padding: 10px 15px; gap: 8px; flex-wrap: nowrap; justify-content: center; border-radius: 30px; width: auto; max-width: 95%; }
+        .control-btn { width: 36px; height: 36px; font-size: 14px; flex-shrink: 0; }
+        .page-counter { font-size: 11px; min-width: 50px; padding: 0 5px; flex-shrink: 0; }
+        .zoom-controls { margin-left: 5px; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, 0.2); gap: 6px; }
+        .fullscreen-btn { margin-left: 5px; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, 0.2); }
+    }
+    @media (max-width: 480px) {
+        .controls { padding: 8px 10px; gap: 5px; }
+        .control-btn { width: 32px; height: 32px; font-size: 12px; }
+        .page-counter { font-size: 10px; min-width: 45px; padding: 0 3px; }
+        .zoom-controls { margin-left: 3px; padding-left: 5px; gap: 4px; }
+        .fullscreen-btn { margin-left: 3px; padding-left: 5px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flipbook-viewer">
+    <div class="viewer-header">
+        <a href="{% url 'home' %}" class="viewer-back"><i class="fas fa-arrow-left"></i> Back to Library</a>
+        <div class="viewer-title">{{ book.title }}</div>
+    </div>
+    <div class="viewer-content" id="viewer-content">
+        <div class="loading-spinner"><i class="fas fa-spinner"></i></div>
+        <div class="flipbook-container" id="flipbook-wrapper" style="display: none;">
+            <div id="flipbook">
+                {% for page in pages %}
+                <div class="page"><img src="{{ page }}" alt="Page {{ forloop.counter }}" loading="lazy"></div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="controls">
+            <button class="control-btn" id="prev-btn" title="Previous Page"><i class="fas fa-chevron-left"></i></button>
+            <button class="control-btn" id="first-btn" title="First Page"><i class="fas fa-step-backward"></i></button>
+            <div class="page-counter"><span id="current-page">1</span> / <span id="total-pages">{{ total_pages }}</span></div>
+            <button class="control-btn" id="last-btn" title="Last Page"><i class="fas fa-step-forward"></i></button>
+            <button class="control-btn" id="next-btn" title="Next Page"><i class="fas fa-chevron-right"></i></button>
+            <div class="zoom-controls">
+                <button class="control-btn" id="zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
+                <button class="control-btn" id="zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+            </div>
+            <div class="fullscreen-btn">
+                <button class="control-btn" id="fullscreen" title="Fullscreen"><i class="fas fa-expand"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
+<script>
+$(document).ready(function() {
+    let currentZoom = 1;
+    const totalPages = {{ total_pages }};
+    function initFlipbook() {
+        const isMobile = window.innerWidth <= 768;
+        $("#flipbook").turn({
+            width: isMobile ? window.innerWidth * 0.9 : 800,
+            height: isMobile ? window.innerHeight * 0.6 : 600,
+            autoCenter: true, acceleration: true, gradients: true, elevation: 50, duration: 1000, pages: totalPages,
+            display: isMobile ? 'single' : 'double',
+            when: { turned: function(event, page, view) { updatePageCounter(page); } }
+        });
+        $('.loading-spinner').fadeOut();
+        $('#flipbook-wrapper').fadeIn();
+        updatePageCounter(1);
+    }
+    function updatePageCounter(page) {
+        $('#current-page').text(page);
+        $('#prev-btn, #first-btn').prop('disabled', page <= 1);
+        $('#next-btn, #last-btn').prop('disabled', page >= totalPages);
+    }
+    $('#prev-btn').click(function() { $("#flipbook").turn("previous"); });
+    $('#next-btn').click(function() { $("#flipbook").turn("next"); });
+    $('#first-btn').click(function() { $("#flipbook").turn("page", 1); });
+    $('#last-btn').click(function() { $("#flipbook").turn("page", totalPages); });
+    $('#zoom-in').click(function() { if (currentZoom < 2) { currentZoom += 0.2; applyZoom(); } });
+    $('#zoom-out').click(function() { if (currentZoom > 0.6) { currentZoom -= 0.2; applyZoom(); } });
+    function applyZoom() { $('#flipbook-wrapper').css('transform', 'scale(' + currentZoom + ')'); }
+    $('#fullscreen').click(function() {
+        const element = document.getElementById('viewer-content');
+        if (!document.fullscreenElement) { element.requestFullscreen(); $(this).find('i').removeClass('fa-expand').addClass('fa-compress'); }
+        else { document.exitFullscreen(); $(this).find('i').removeClass('fa-compress').addClass('fa-expand'); }
+    });
+    $(document).keydown(function(e) {
+        switch(e.which) {
+            case 37: $("#flipbook").turn("previous"); break;
+            case 39: $("#flipbook").turn("next"); break;
+            case 36: $("#flipbook").turn("page", 1); break;
+            case 35: $("#flipbook").turn("page", totalPages); break;
+        }
+    });
+    $(window).resize(function() {
+        const isMobile = window.innerWidth <= 768;
+        const currentPage = $("#flipbook").turn("page");
+        $("#flipbook").turn("destroy");
+        $("#flipbook").turn({
+            width: isMobile ? window.innerWidth * 0.9 : 800,
+            height: isMobile ? window.innerHeight * 0.6 : 600,
+            autoCenter: true, acceleration: true, gradients: true, elevation: 50, duration: 1000, pages: totalPages,
+            display: isMobile ? 'single' : 'double', page: currentPage,
+            when: { turned: function(event, page, view) { updatePageCounter(page); } }
+        });
+    });
+    setTimeout(initFlipbook, 500);
+});
+</script>
+{% endblock %}
